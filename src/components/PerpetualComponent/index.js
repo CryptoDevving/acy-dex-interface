@@ -1250,24 +1250,6 @@ const SwapComponent = props => {
                     />
                 </div>
             }
-            {mode === SWAP &&
-                <DetailBox
-                    leverage={leverage}
-                    shortOrLong={mode}
-                    marketOrLimit={type}
-                    profitsIn={profitsIn}
-                    entryPriceLimit={entryPriceLimit}
-                    liqPrice={liqPrice}
-                    entryPriceMarket={entryPriceMarket}
-                    exitPrice={exitPrice}
-                    borrowFee={borrowFee}
-                    token1Symbol={token1.symbol}
-                    fromUsdMin={fromUsdMin}
-                    toUsdMax={toUsdMax}
-                    toTokenInfo={toTokenInfo}
-                    triggerPriceValue={triggerPriceValue}
-                />
-            }
             {needApprove
                 ? <div>
                     <AcyButton
@@ -1321,6 +1303,24 @@ const SwapComponent = props => {
             <TokenSelectorModal
                 onCancel={onCancel} width={400} visible={visible} onCoinClick={onCoinClick}
             />
+            {mode === SWAP &&
+                <DetailBox
+                    leverage={leverage}
+                    shortOrLong={mode}
+                    marketOrLimit={type}
+                    profitsIn={profitsIn}
+                    entryPriceLimit={entryPriceLimit}
+                    liqPrice={liqPrice}
+                    entryPriceMarket={entryPriceMarket}
+                    exitPrice={exitPrice}
+                    borrowFee={borrowFee}
+                    token1Symbol={token1.symbol}
+                    fromUsdMin={fromUsdMin}
+                    toUsdMax={toUsdMax}
+                    toTokenInfo={toTokenInfo}
+                    triggerPriceValue={triggerPriceValue}
+                />
+            }
         </div>
     );
 };

@@ -161,6 +161,14 @@ export const DetailBox = (props) => {
             // hasZeroBorrowFee = true
         }
     }
+    //hj TODO swap not showing borrowFee
+    if (shortOrLong === SWAP && shortCollateralToken && shortCollateralToken.fundingRate) {
+        borrowFeeText =
+            formatAmount(shortCollateralToken.fundingRate, 4, 4) + "% / 1h";
+        if (shortCollateralToken.fundingRate.eq(0)) {
+            // hasZeroBorrowFee = true
+        }
+    }
 
     // liquidation part end
 

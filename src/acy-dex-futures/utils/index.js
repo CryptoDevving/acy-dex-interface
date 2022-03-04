@@ -14,6 +14,14 @@ export const MAX_LEVERAGE = 100 * 10000;
 export const POSITIONS = 'Positions';
 export const ACTIONS = 'Actions';
 export const ORDERS = 'Orders';
+export const PRECISION = expandDecimals(1, 30);
+export const USDG_DECIMALS = 18;
+export const TAX_BASIS_POINTS = 50;
+export const STABLE_TAX_BASIS_POINTS = 5;
+// export const MINT_BURN_FEE_BASIS_POINTS = 25;
+export const SWAP_FEE_BASIS_POINTS = 25;
+export const STABLE_SWAP_FEE_BASIS_POINTS = 1;
+
 const USDG_ADDRESS = '0x45096e7aA921f27590f8F19e457794EB09678141';
 
 const { AddressZero } = ethers.constants
@@ -497,6 +505,66 @@ export function getMarginFee(sizeDelta) {
     return sizeDelta.sub(afterFeeUsd)
 }
 // ymj
+
+//hj
+export function getFeeBasisPoints(
+    token,
+    usdgDelta,
+    feeBasisPoints,
+    taxBasisPoints,
+    increment,
+    usdgSupply,
+    totalTokenWeights
+) {
+    if (!token || !token.usdgAmount || !usdgSupply || !totalTokenWeights) {
+        return 0;
+    }
+
+    feeBasisPoints = bigNumberify(feeBasisPoints);
+    taxBasisPoints = bigNumberify(taxBasisPoints);
+
+    const initialAmount = token.usdgAmount;
+    let nextAmount = initialAmount.add(usdgDelta);
+    if (!increment) {
+        nextAmount = usdgDelta.gt(initialAmount) ? bigNumberify(0) : initialAmount.sub(usdgDelta);
+    }
+
+    const targetAmount = getTargetUsdgAmount(token, usdgSupply, totalTokenWeights);
+    if (!targetAmount || targetAmount.eq(0)) {
+        return feeBasisPoints.toNumber();
+    }
+
+    const initialDiff = initialAmount.gt(targetAmount)
+        ? initialAmount.sub(targetAmount)
+        : targetAmount.sub(initialAmount);
+    const nextDiff = nextAmount.gt(targetAmount) ? nextAmount.sub(targetAmount) : targetAmount.sub(nextAmount);
+
+    if (nextDiff.lt(initialDiff)) {
+        const rebateBps = taxBasisPoints.mul(initialDiff).div(targetAmount);
+        return rebateBps.gt(feeBasisPoints) ? 0 : feeBasisPoints.sub(rebateBps).toNumber();
+    }
+
+    let averageDiff = initialDiff.add(nextDiff).div(2);
+    if (averageDiff.gt(targetAmount)) {
+        averageDiff = targetAmount;
+    }
+    const taxBps = taxBasisPoints.mul(averageDiff).div(targetAmount);
+    return feeBasisPoints.add(taxBps).toNumber();
+}
+
+const adjustForDecimalsFactory = (n) => (number) => {
+    if (n === 0) {
+        return number;
+    }
+    if (n > 0) {
+        return number.mul(expandDecimals(1, n));
+    }
+    return number.div(expandDecimals(1, -n));
+};
+export function adjustForDecimals(amount, divDecimals, mulDecimals) {
+    return amount.mul(expandDecimals(1, mulDecimals)).div(expandDecimals(1, divDecimals));
+}
+
 export function getNextFromAmount(
     chainId,
     toAmount,

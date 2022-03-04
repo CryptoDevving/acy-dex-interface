@@ -167,7 +167,7 @@ const SwapComponent = props => {
     const { isConfirming, setIsConfirming } = props;
     console.log("here after confirm props");
     // isPendingConfirmation, setIsPendingConfirmation } = props;
-    // const { savedSlippageAmount } = props;
+    const { savedSlippageAmount } = props;
 
     // 选择货币的弹窗
     const [visible, setVisible] = useState(null);
@@ -528,10 +528,10 @@ const SwapComponent = props => {
                 setSwapButtonState(false);
                 setSwapButtonContent('Connect to Wallet');
             }
-            // else {
-            //     setSwapButtonState(true);
-            //     setSwapButtonContent('Swap');
-            // }
+            else {
+                setSwapButtonState(true);
+                setSwapButtonContent('Swap');
+            }
 
         },
         [account]
@@ -551,7 +551,7 @@ const SwapComponent = props => {
         if (mode === LONG || mode === SHORT)
             updateLeverageAmounts();
         else {
-            // swap function
+            updateSwapAmounts();
         }
     }, [
         anchorOnFromAmount,
@@ -567,7 +567,7 @@ const SwapComponent = props => {
         isMarketOrder,
         type,
         triggerPriceUsd,
-        //triggerRatio,
+        triggerRatio,
         //hasLeverageOption,
         leverage,
         usdgSupply,
@@ -717,6 +717,52 @@ const SwapComponent = props => {
             );
             setFromValue(nextFromValue);
             setToken0Amount(nextFromValue);
+        }
+    };
+
+    const updateSwapAmounts = () => {
+        if (anchorOnFromAmount) {
+            if (!fromAmount) {
+                setToValue("");
+                return;
+            }
+            if (toToken) {
+                const { amount: nextToAmount } = getNextToAmount(
+                    chainId,
+                    fromAmount,
+                    fromTokenAddress,
+                    toTokenAddress,
+                    infoTokens,
+                    undefined,
+                    !isMarketOrder && triggerRatio,
+                    usdgSupply,
+                    totalTokenWeights
+                );
+
+                const nextToValue = formatAmountFree(nextToAmount, toToken.decimals, toToken.decimals);
+                setToValue(nextToValue);
+            }
+            return;
+        }
+
+        if (!toAmount) {
+            setFromValue("");
+            return;
+        }
+        if (fromToken) {
+            const { amount: nextFromAmount } = getNextFromAmount(
+                chainId,
+                toAmount,
+                fromTokenAddress,
+                toTokenAddress,
+                infoTokens,
+                undefined,
+                !isMarketOrder && triggerRatio,
+                usdgSupply,
+                totalTokenWeights
+            );
+            const nextFromValue = formatAmountFree(nextFromAmount, fromToken.decimals, fromToken.decimals);
+            setFromValue(nextFromValue);
         }
     };
 
@@ -1036,7 +1082,7 @@ const SwapComponent = props => {
         sti(status.hash);
     };
 
-    // LONG or SHORT
+    // LONG or SHORT or SWAP
     const modeSelect = (input) => {
         setMode(input.target.value);
     }

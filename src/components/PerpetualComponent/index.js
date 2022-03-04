@@ -166,8 +166,10 @@ const SwapComponent = props => {
     const { infoTokens_test, usdgSupply, positions } = props;
     const { isConfirming, setIsConfirming } = props;
     console.log("here after confirm props");
-    // isPendingConfirmation, setIsPendingConfirmation } = props;
+    const { isPendingConfirmation, setIsPendingConfirmation } = props;
+    const { approveOrderBpok } = props;
     const { savedSlippageAmount } = props;
+    //const needOrderBookApproval = !isMarketOrder && !orderBookApproved;
 
     // 选择货币的弹窗
     const [visible, setVisible] = useState(null);
@@ -813,6 +815,7 @@ const SwapComponent = props => {
     };
 
     const wrap = async () => {
+        console.log("in wrap")
         setIsSubmitting(true);
 
         const contract = new ethers.Contract(
@@ -1022,23 +1025,29 @@ const SwapComponent = props => {
         //approve from token (in gmx = approve in acy)
         //modal
         //after isSwap
-        if (
-            fromTokenAddress === AddressZero &&
-            toTokenAddress === getContractAddress(chainId, "NATIVE_TOKEN")
-        ) {
-            wrap();
-            return
-        }
 
-        if (
-            token0Addr === getContractAddress(chainId, "NATIVE_TOKEN") &&
-            token1Addr === AddressZero
-        ) {
-            unwrap();
-            return;
-        }
-        setIsConfirming(true);
+        // console.log("fromToken", fromTokenAddress)
+        // console.log("toToken", toTokenAddress)
+
+        // if (needOrderBookApproval) {
+        //     approveOrderBook();
+        //     return;
+        // }
+
+        setIsPendingConfirmation(true);
+
+        swap();
+
+        // if (orderOption === LIMIT) {
+        //     createIncreaseOrder();
+        //     return;
+        // }
+        // increasePosition();
+
+        //setIsConfirming(true);
+        //confirm metamask operation confirmed or not
         //metamask operations
+        //setSwapButtonState(true);
     }
 
     // swap的交易状态
@@ -1284,11 +1293,11 @@ const SwapComponent = props => {
                             // connectWalletByLocalStorage();
                         } else {
                             //hj TODO
-                            // if ( currentTab == "swap" ) {
-                            //     setSwapButtonState( false )
-                            //     handleSwap();
-                            // }
-                            console.log("ready for function ymj");
+                            if (mode === "Swap") {
+                                setSwapButtonState(false)
+                                handleSwap();
+                            }
+                            //console.log("ready for function ymj");
                         }
                     }}
                 >

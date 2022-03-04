@@ -306,6 +306,24 @@ const Swap = props => {
     const tokens = sampleGmxTokens;
     const positionQuery = getPositionQuery(whitelistedTokens, nativeTokenAddress)
 
+    const approveOrderBook = () => {
+        setIsPluginApproving(true);
+        return approvePlugin(chainId, orderBookAddress, {
+            library,
+            pendingTxns,
+            setPendingTxns,
+            sentMsg: "Enable orders sent",
+            failMsg: "Enable orders failed",
+        })
+            .then(() => {
+                setIsWaitingForPluginApproval(true);
+                updateOrderBookApproved(undefined, true);
+            })
+            .finally(() => {
+                setIsPluginApproving(false);
+            });
+    };
+
     //------FOR Pricehart-----TODO Austin
     const chartRef = useRef(null);
 
@@ -937,8 +955,8 @@ const Swap = props => {
                                     borrowFee={123}
                                     isConfirming={isConfirming}
                                     setIsConfirming={setIsConfirming}
-                                // isPendingConfirmation={isPendingConfirmation}
-                                // setIsPendingConfirmation={setIsPendingConfirmation}
+                                    isPendingConfirmation={isPendingConfirmation}
+                                    setIsPendingConfirmation={setIsPendingConfirmation}
                                 //savedSlippageAmount={getSavedSlippageAmount()}
                                 />
                             </div>

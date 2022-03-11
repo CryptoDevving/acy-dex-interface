@@ -1867,13 +1867,13 @@ const SwapComponent = props => {
                 }
 
                 <div>
-                    <AcyButton
+                    {/* <AcyButton
                         style={{ marginTop: '25px' }}
                         onClick={onClickPrimary}
-                        disabled={!isPrimaryEnabled()}
+                        //disabled={!isPrimaryEnabled()}
                     >
                         {getPrimaryText()}
-                    </AcyButton>
+                    </AcyButton> */}
                 </div>
 
             </AcyCard>

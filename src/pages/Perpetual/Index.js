@@ -1,5 +1,6 @@
+/* eslint-disable no-useless-computed-key */
 import { useWeb3React } from '@web3-react/core';
-import React, { Component, useState, useEffect, useRef } from 'react';
+import React, { Component, useState, useEffect, useRef, useCallback, useMemo } from 'react';
 import { connect } from 'umi';
 import { Button, Row, Col, Icon, Skeleton, Card } from 'antd';
 import samplePositionsData from "./SampleData"
@@ -22,6 +23,7 @@ import {
     POSITIONS,
     FUNDING_RATE_PRECISION,
     BASIS_POINTS_DIVISOR,
+    ARBITRUM_DEFAULT_COLLATERAL_SYMBOL,
     getLiquidationPrice,
     getTokenInfo,
     getInfoTokens,
@@ -30,6 +32,7 @@ import {
     getLeverage,
     bigNumberify,
     getDeltaStr,
+    useLocalStorageByChainId,
     getSavedSlippageAmount
 } from '@/acy-dex-futures/utils';
 
@@ -45,6 +48,7 @@ import {
     routerAddress,
 
 } from '@/acy-dex-futures/samples/constants'
+import { approvePlugin } from '@/acy-dex-futures/core/Perpetual'
 import Media from 'react-media';
 import { uniqueFun } from '@/utils/utils';
 import { getTransactionsByAccount, appendNewSwapTx, findTokenWithSymbol } from '@/utils/txData';
@@ -268,11 +272,21 @@ export function getPositions(chainId, positionQuery, positionData, infoTokens, i
     return { positions, positionsMap }
 }
 
+function getTokenBySymbol(tokenlist, symbol) {
+    for (let i = 0; i < tokenlist.length; i++) {
+        if (tokenlist[i].symbol === symbol) {
+            return tokenlist[i]
+        }
+    }
+    return undefined
+}
+
 const Swap = props => {
+    const { savedIsPnlInLeverage, setSavedIsPnlInLeverage, savedSlippageAmount, pendingTxns, setPendingTxns } = props
+
     const { account, library, chainId, tokenList: supportedTokens, farmSetting: { API_URL: apiUrlPrefix }, globalSettings, } = useConstantLoader();
     console.log("@/ inside swap:", supportedTokens, apiUrlPrefix)
 
-    //hj
     const [isConfirming, setIsConfirming] = useState(false);
     const [isPendingConfirmation, setIsPendingConfirmation] = useState(false);
     const [pricePoint, setPricePoint] = useState(0);
@@ -306,29 +320,41 @@ const Swap = props => {
     const tokens = sampleGmxTokens;
     const positionQuery = getPositionQuery(whitelistedTokens, nativeTokenAddress)
 
-    const approveOrderBook = () => {
-        setIsPluginApproving(true);
-        return approvePlugin(chainId, orderBookAddress, {
-            library,
-            pendingTxns,
-            setPendingTxns,
-            sentMsg: "Enable orders sent",
-            failMsg: "Enable orders failed",
-        })
-            .then(() => {
-                setIsWaitingForPluginApproval(true);
-                updateOrderBookApproved(undefined, true);
-            })
-            .finally(() => {
-                setIsPluginApproving(false);
-            });
-    };
-
     //------FOR Pricehart-----TODO Austin
     const chartRef = useRef(null);
 
 
+    const defaultTokenSelection = useMemo(() => ({
+        ["Swap"]: {
+            from: AddressZero,
+            to: getTokenBySymbol(tokens, ARBITRUM_DEFAULT_COLLATERAL_SYMBOL).address,
+        },
+        ["Long"]: {
+            from: AddressZero,
+            to: AddressZero,
+        },
+        ["Short"]: {
+            from: getTokenBySymbol(tokens, ARBITRUM_DEFAULT_COLLATERAL_SYMBOL).address,
+            to: AddressZero,
+        }
+    }), [chainId, ARBITRUM_DEFAULT_COLLATERAL_SYMBOL])
 
+    const [tokenSelection, setTokenSelection] = useLocalStorageByChainId(chainId, "Exchange-token-selection-v2", defaultTokenSelection)
+    const [swapOption, setSwapOption] = useLocalStorageByChainId(chainId, 'Swap-option-v2', "Long")
+    const fromTokenAddress = tokenSelection[swapOption].from
+    const toTokenAddress = tokenSelection[swapOption].to
+
+    const setFromTokenAddress = useCallback((selectedSwapOption, address) => {
+        const newTokenSelection = JSON.parse(JSON.stringify(tokenSelection))
+        newTokenSelection[selectedSwapOption].from = address
+        setTokenSelection(newTokenSelection)
+    }, [tokenSelection, setTokenSelection])
+
+    const setToTokenAddress = useCallback((selectedSwapOption, address) => {
+        const newTokenSelection = JSON.parse(JSON.stringify(tokenSelection))
+        newTokenSelection[selectedSwapOption].to = address
+        setTokenSelection(newTokenSelection)
+    }, [tokenSelection, setTokenSelection])
 
     const { data: vaultTokenInfo, mutate: updateVaultTokenInfo } = useSWR([chainId, readerAddress, "getFullVaultTokenInfo"], {
         fetcher: fetcher(tempLibrary, Reader, [vaultAddress, nativeTokenAddress, expandDecimals(1, 18), whitelistedTokenAddresses]),
@@ -345,11 +371,11 @@ const Swap = props => {
         fetcher: fetcher(tempLibrary, Reader, [vaultAddress, nativeTokenAddress, whitelistedTokenAddresses]),
     })
 
-    const { data: totalTokenWeights, mutate: updateTotalTokenWeights } = useSWR([`Exchange:totalTokenWeights:${true}`, tempChainID, vaultAddress, "totalTokenWeights"], {
+    const { data: totalTokenWeights, mutate: updateTotalTokenWeights } = useSWR([tempChainID, vaultAddress, "totalTokenWeights"], {
         fetcher: fetcher(tempLibrary, VaultV2),
     })
 
-    const { data: usdgSupply, mutate: updateUsdgSupply } = useSWR([`Exchange:usdgSupply:${true}`, tempChainID, usdgAddress, "totalSupply"], {
+    const { data: usdgSupply, mutate: updateUsdgSupply } = useSWR([tempChainID, usdgAddress, "totalSupply"], {
         fetcher: fetcher(tempLibrary, Token),
     })
 
@@ -361,7 +387,25 @@ const Swap = props => {
     const infoTokens = getInfoTokens(tokens, tokenBalances, whitelistedTokens, vaultTokenInfo, fundingRateInfo)
     const { positions, positionsMap } = getPositions(tempChainID, positionQuery, positionData, infoTokens, true)
 
-    //--------- 
+    const [isWaitingForPluginApproval, setIsWaitingForPluginApproval] = useState(false);
+    const [isPluginApproving, setIsPluginApproving] = useState(false);
+
+    const approveOrderBook = () => {
+        setIsPluginApproving(true)
+        return approvePlugin(chainId, orderBookAddress, {
+            library,
+            pendingTxns,
+            setPendingTxns
+        })
+            .then(() => {
+                setIsWaitingForPluginApproval(true)
+                updateOrderBookApproved(undefined, true);
+            })
+            .finally(() => {
+                setIsPluginApproving(false)
+            })
+    }
+
     useEffect(() => {
         if (!supportedTokens) return
 
@@ -932,35 +976,54 @@ const Swap = props => {
                         <div ref={chartRef}></div>
                     </div>
                     <div className={`${styles.colItem} ${styles.perpetualComponent}`} >
-                        <AcyCard style={{ backgroundColor: '#1B1B1C', padding: '10px' }}>
-                            <div className={styles.trade}>
-                                <PerpetualComponent
-                                    onSelectToken0={token => {
-                                        setActiveToken0(token);
-                                    }}
-                                    onSelectToken1={token => {
-                                        setActiveToken1(token);
+                        {/* <AcyCard style={{ backgroundColor: '#1B1B1C', padding: '10px' }}> */}
+                        <div className={styles.trade}>
+                            <PerpetualComponent
+                                fromTokenAddress={fromTokenAddress}
+                                setFromTokenAddress={setFromTokenAddress}
+                                toTokenAddress={toTokenAddress}
+                                setToTokenAddress={setToTokenAddress}
+                                positionsMap={positionsMap}
+                                pendingTxns={pendingTxns}
+                                setPendingTxns={setPendingTxns}
+                                tokenSelection={tokenSelection}
+                                setTokenSelection={setTokenSelection}
+                                savedSlippageAmount={savedSlippageAmount}
+                                savedIsPnlInLeverage={savedIsPnlInLeverage}
+                                approveOrderBook={approveOrderBook}
+                                isWaitingForPluginApproval={isWaitingForPluginApproval}
+                                setIsWaitingForPluginApproval={setIsWaitingForPluginApproval}
+                                isPluginApproving={isPluginApproving}
 
-                                    }}
-                                    infoTokens_test={infoTokens}
-                                    positions={positions}
-                                    positionsMap={positionsMap}
-                                    usdgSupply={usdgSupply}
-                                    tokens={tokens}
-                                    onGetReceipt={onGetReceipt}
-                                    profitsIn={'ETH'}
-                                    liqPrice={456}
-                                    entryPriceMarket={123}
-                                    exitPrice={123}
-                                    borrowFee={123}
-                                    isConfirming={isConfirming}
-                                    setIsConfirming={setIsConfirming}
-                                    isPendingConfirmation={isPendingConfirmation}
-                                    setIsPendingConfirmation={setIsPendingConfirmation}
-                                //savedSlippageAmount={getSavedSlippageAmount()}
-                                />
-                            </div>
-                        </AcyCard>
+                                positions={positions}
+                                profitsIn={'ETH'}
+                                liqPrice={456}
+                                entryPriceMarket={123}
+                                exitPrice={123}
+                                borrowFee={123}
+                            />
+                            {/* <PerpetualComponent
+                      onSelectToken0={token => {
+                        setActiveToken0(token);
+                      }}
+                      onSelectToken1={token => {
+                        setActiveToken1(token);
+
+                      }}
+                      infoTokens_test = {infoTokens}
+                      positions = {positions}
+                      positionsMap = {positionsMap}
+                      usdgSupply = {usdgSupply}
+                      tokens={tokens}
+                      onGetReceipt={onGetReceipt}
+                      profitsIn={'ETH'} 
+                      liqPrice={456}
+                      entryPriceMarket={123}
+                      exitPrice={123}
+                      borrowFee={123}
+                    /> */}
+                        </div>
+                        {/* </AcyCard> */}
                     </div>
 
                 </div>
@@ -971,6 +1034,7 @@ const Swap = props => {
                         <a className={`${styles.colItem} ${styles.optionTab}`} onClick={() => { setTableContent(ACTIONS) }}>Actions </a>
                     </div>
                 </div>
+
                 <div className={styles.rowFlexContainer}>
                     <div className={`${styles.colItem} ${styles.priceChart}`}>
                         <div className={styles.Trade}>

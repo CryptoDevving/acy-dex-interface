@@ -133,6 +133,21 @@ export function useLocalStorageByChainId(chainId, key, defaultValue) {
     return [value, setValue];
 }
 
+export function getExchangeRate(tokenAInfo, tokenBInfo, inverted) {
+    if (
+        !tokenAInfo ||
+        !tokenAInfo.minPrice ||
+        !tokenBInfo ||
+        !tokenBInfo.maxPrice
+    ) {
+        return;
+    }
+    if (inverted) {
+        return tokenAInfo.minPrice.mul(PRECISION).div(tokenBInfo.maxPrice);
+    }
+    return tokenBInfo.maxPrice.mul(PRECISION).div(tokenAInfo.minPrice);
+}
+
 export function adjustForDecimals(amount, divDecimals, mulDecimals) {
     return amount
         .mul(expandDecimals(1, mulDecimals))
@@ -243,6 +258,61 @@ export function getTargetUsdgAmount(token, usdgSupply, totalTokenWeights) {
     }
 
     return token.weight.mul(usdgSupply).div(totalTokenWeights);
+}
+
+export function getFeeBasisPoints(
+    token,
+    usdgDelta,
+    feeBasisPoints,
+    taxBasisPoints,
+    increment,
+    usdgSupply,
+    totalTokenWeights
+) {
+    if (!token || !token.usdgAmount || !usdgSupply || !totalTokenWeights) {
+        return 0;
+    }
+
+    feeBasisPoints = bigNumberify(feeBasisPoints);
+    taxBasisPoints = bigNumberify(taxBasisPoints);
+
+    const initialAmount = token.usdgAmount;
+    let nextAmount = initialAmount.add(usdgDelta);
+    if (!increment) {
+        nextAmount = usdgDelta.gt(initialAmount)
+            ? bigNumberify(0)
+            : initialAmount.sub(usdgDelta);
+    }
+
+    const targetAmount = getTargetUsdgAmount(
+        token,
+        usdgSupply,
+        totalTokenWeights
+    );
+    if (!targetAmount || targetAmount.eq(0)) {
+        return feeBasisPoints.toNumber();
+    }
+
+    const initialDiff = initialAmount.gt(targetAmount)
+        ? initialAmount.sub(targetAmount)
+        : targetAmount.sub(initialAmount);
+    const nextDiff = nextAmount.gt(targetAmount)
+        ? nextAmount.sub(targetAmount)
+        : targetAmount.sub(nextAmount);
+
+    if (nextDiff.lt(initialDiff)) {
+        const rebateBps = taxBasisPoints.mul(initialDiff).div(targetAmount);
+        return rebateBps.gt(feeBasisPoints)
+            ? 0
+            : feeBasisPoints.sub(rebateBps).toNumber();
+    }
+
+    let averageDiff = initialDiff.add(nextDiff).div(2);
+    if (averageDiff.gt(targetAmount)) {
+        averageDiff = targetAmount;
+    }
+    const taxBps = taxBasisPoints.mul(averageDiff).div(targetAmount);
+    return feeBasisPoints.add(taxBps).toNumber();
 }
 
 export function getBuyGlpToAmount(
@@ -487,7 +557,6 @@ export function getPositionKey(collateralTokenAddress, indexTokenAddress, isLong
 }
 
 export function getInfoTokens(tokens, tokenBalances, whitelistedTokens, vaultTokenInfo, fundingRateInfo, vaultPropsLength) {
-
     if (!vaultPropsLength) {
         vaultPropsLength = 12
     }
@@ -556,9 +625,9 @@ export function getProvider(library, chainId) {
 
 export const fetcher = (library, contractInfo, additionalArgs) => (...args) => {
     // eslint-disable-next-line
-    const [chainId, arg0, arg1, ...params] = args;
-    const provider = getProvider(library, chainId);
-    const method = ethers.utils.isHexString(arg0) ? arg1 : arg0;
+    const [chainId, arg0, arg1, ...params] = args
+    // const provider = library.getSigner(params[1])
+    const method = ethers.utils.isAddress(arg0) ? arg1 : arg0
 
     function onError(e) {
         console.error(contractInfo.contractName, method, e)
@@ -566,14 +635,16 @@ export const fetcher = (library, contractInfo, additionalArgs) => (...args) => {
 
     if (ethers.utils.isHexString(arg0)) {
         const address = arg0
-        const contract = new ethers.Contract(address, contractInfo.abi, provider)
+        const contract = new ethers.Contract(address, contractInfo.abi, library)
         try {
             if (additionalArgs) {
-                console.log('FETCHER FUNCTION CALLED WITH METHOD  --> ', method);
-                console.log('printing additional args', params, additionalArgs);
-                console.log('printing provider', contract);
+                // console.log('FETCHER FUNCTION CALLED WITH METHOD  --> ', method);
+                // console.log('printing additional args', params, additionalArgs);
+                // console.log('printing provider', contract);
                 return contract[method](...params.concat(additionalArgs)).catch(onError)
             }
+            console.log("contract", contract)
+
             return contract[method](...params).catch(onError)
         } catch (e) {
             console.log('error', e);
@@ -934,56 +1005,6 @@ export function getMarginFee(sizeDelta) {
     const afterFeeUsd = sizeDelta.mul(BASIS_POINTS_DIVISOR - MARGIN_FEE_BASIS_POINTS).div(BASIS_POINTS_DIVISOR)
     return sizeDelta.sub(afterFeeUsd)
 }
-// ymj
-
-//hj
-export function getFeeBasisPoints(
-    token,
-    usdgDelta,
-    feeBasisPoints,
-    taxBasisPoints,
-    increment,
-    usdgSupply,
-    totalTokenWeights
-) {
-    if (!token || !token.usdgAmount || !usdgSupply || !totalTokenWeights) {
-        return 0;
-    }
-
-    feeBasisPoints = bigNumberify(feeBasisPoints);
-    taxBasisPoints = bigNumberify(taxBasisPoints);
-
-    const initialAmount = token.usdgAmount;
-    let nextAmount = initialAmount.add(usdgDelta);
-    if (!increment) {
-        nextAmount = usdgDelta.gt(initialAmount) ? bigNumberify(0) : initialAmount.sub(usdgDelta);
-    }
-
-    const targetAmount = getTargetUsdgAmount(token, usdgSupply, totalTokenWeights);
-    if (!targetAmount || targetAmount.eq(0)) {
-        return feeBasisPoints.toNumber();
-    }
-
-    const initialDiff = initialAmount.gt(targetAmount)
-        ? initialAmount.sub(targetAmount)
-        : targetAmount.sub(initialAmount);
-    const nextDiff = nextAmount.gt(targetAmount) ? nextAmount.sub(targetAmount) : targetAmount.sub(nextAmount);
-
-    if (nextDiff.lt(initialDiff)) {
-        const rebateBps = taxBasisPoints.mul(initialDiff).div(targetAmount);
-        return rebateBps.gt(feeBasisPoints) ? 0 : feeBasisPoints.sub(rebateBps).toNumber();
-    }
-
-    let averageDiff = initialDiff.add(nextDiff).div(2);
-    if (averageDiff.gt(targetAmount)) {
-        averageDiff = targetAmount;
-    }
-    const taxBps = taxBasisPoints.mul(averageDiff).div(targetAmount);
-    return feeBasisPoints.add(taxBps).toNumber();
-}
-
-
-
 const adjustForDecimalsFactory = n => number => {
     if (n === 0) {
         return number;

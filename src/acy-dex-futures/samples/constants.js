@@ -11,7 +11,7 @@ export const orderBookAddress = '0x09f77E8A13De9a35a7231028187e9fD5DB8a2ACB';
 export const routerAddress = '0xaBBc5F99639c9B6bCb58544ddf04EFA6802F4064'
 
 export const tempLibrary = new JsonRpcProvider('https://arb1.arbitrum.io/rpc')
-export const tempChainID = 42161;
+export const tempChainID = 97;
 
 
 export const glpManagerAddress = "0x321F653eED006AD1C29D174e17d96351BDe22649"

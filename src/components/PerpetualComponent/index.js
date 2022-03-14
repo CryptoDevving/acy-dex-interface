@@ -69,7 +69,11 @@ import {
     getLiquidationPrice,
     calculatePositionDelta,
     getSavedSlippageAmount,
-    approveTokens
+    approveTokens,
+    shouldRaiseGasError,
+    helperToast,
+    replaceNativeTokenAddress,
+    getExchangeRate
 } from '@/acy-dex-futures/utils'
 import {
     readerAddress,
@@ -78,8 +82,13 @@ import {
     nativeTokenAddress,
     routerAddress,
     orderBookAddress,
-    tempChainID
+    // tempChainID,
+    // tempLibrary
 } from '@/acy-dex-futures/samples/constants'
+// import { getTokens } from '../../acy-dex-futures/data/Tokens'
+// import { getTokens } from '@/acy-dex-futures/data/Tokens'
+
+
 import { callContract } from '@/acy-dex-futures/core/Perpetual'
 import Reader from '@/acy-dex-futures/abis/Reader.json'
 import ReaderV2 from '@/acy-dex-futures/abis/ReaderV2.json'
@@ -130,7 +139,7 @@ import Router from "@/acy-dex-futures/abis/Router.json";
 
 
 import {
-    //Token,
+    // Token,
     TokenAmount,
     Pair,
     TradeType,
@@ -143,7 +152,6 @@ import {
     // ETHER,
     CurrencyAmount,
     InsufficientReservesError,
-    //TODO //Token, WETH and ETHER hj
 } from '@acyswap/sdk';
 
 import { MaxUint256 } from '@ethersproject/constants';
@@ -224,6 +232,29 @@ function getNextAveragePrice({ size, sizeDelta, hasProfit, delta, nextPrice, isL
 const SwapComponent = props => {
 
     const {
+        account,
+        library,
+        chainId,
+        tokenList: INITIAL_TOKEN_LIST,
+        farmSetting: { INITIAL_ALLOWED_SLIPPAGE },
+    } = useConstantLoader(props);
+    // console.log('constant loader chainid', chainId);
+    // const {
+    //   dispatch,
+    //   onSelectToken0,
+    //   onSelectToken1,
+    //   onSelectToken,
+    //   token,
+    //   isLockedToken1 = false,
+    // } = props;
+    const { profitsIn, liqPrice } = props;
+    const { entryPriceMarket, exitPrice, borrowFee, positions } = props;
+    // const { infoTokens_test, usdgSupply, positions } = props;
+
+    // isPendingConfirmation, setIsPendingConfirmation } = props;
+    // const { savedSlippageAmount } = props;
+
+    const {
         positionsMap,
         pendingTxns,
         setPendingTxns,
@@ -237,7 +268,7 @@ const SwapComponent = props => {
     } = props;
 
     const connectWalletByLocalStorage = useConnectWallet();
-    const { library, active, activate } = useWeb3React();
+    const { active, activate } = useWeb3React();
     const flagOrdersEnabled = true
 
     const [fromValue, setFromValue] = useState("");
@@ -251,29 +282,9 @@ const SwapComponent = props => {
     const [modalError, setModalError] = useState(false);
     const [ordersToaOpen, setOrdersToaOpen] = useState(false);
 
-
-    // ymj props
-    const { account, tokenList: INITIAL_TOKEN_LIST, farmSetting: { INITIAL_ALLOWED_SLIPPAGE } } = useConstantLoader(props);
-    // const { dispatch, onSelectToken0, onSelectToken1, onSelectToken, token, isLockedToken1 = false } = props;
-    const { profitsIn, liqPrice } = props;
-    const { entryPriceMarket, exitPrice, borrowFee, positions } = props;
-    // const { infoTokens_test, usdgSupply, positions, positionsMap } = props;
-
-    // 交易对前置货币
-    const [token0, setToken0] = useState(INITIAL_TOKEN_LIST[0]);
-    // 交易对后置货币
-    const [token1, setToken1] = useState(INITIAL_TOKEN_LIST[1]);
-    // 交易对前置货币余额
-    const [token0Balance, setToken0Balance] = useState('0');
-    // 交易对后置货币余额
-    const [token1Balance, setToken1Balance] = useState('0');
-
-    const [token0BalanceShow, setToken0BalanceShow] = useState(false);
-    const [token1BalanceShow, setToken1BalanceShow] = useState(false);
-
-    const chainId = tempChainID
     const savedSlippageAmount = getSavedSlippageAmount(chainId)
-    const tokens = defaultToken.default
+    console.log("here tokens")
+    const tokens = defaultToken
     const whitelistedTokens = tokens.filter(t => t.symbol !== "USDG")
     const stableTokens = tokens.filter(token => token.isStable);
     const indexTokens = whitelistedTokens.filter(token => !token.isStable && !token.isWrapped);
@@ -754,27 +765,8 @@ const SwapComponent = props => {
                     fromToken.decimals,
                     fromToken.decimals
                 );
-                // Api.callContract(chainId, contract, "withdraw", [fromAmount], {
-                //     sentMsg: "Swap submitted!",
-                //     failMsg: "Swap failed.",
-                //     successMsg: `Swapped ${formatAmount(
-                //         fromAmount,
-                //         fromToken.decimals,
-                //         4,
-                //         true
-                //     )} ${fromToken.symbol} for ${formatAmount(
-                //         toAmount,
-                //         toToken.decimals,
-                //         4,
-                //         true
-                //     )} ${toToken.symbol}`,
-                //     setPendingTxns
-                // })
-                //     .then(async res => { })
-                //     .finally(() => {
-                //         setIsSubmitting(false);
-                //     });
-                setFromValue
+
+                setFromValue(nextFromValue);
             }
         };
 
@@ -923,6 +915,7 @@ const SwapComponent = props => {
     const [visible, setVisible] = useState()
 
     const selectFromToken = token => {
+        console.log("token selected", token.address)
         setFromTokenAddress(token.address);
         setIsWaitingForApproval(false);
 
@@ -945,45 +938,47 @@ const SwapComponent = props => {
         setToValue(e.target.value);
     };
 
-    // swap的交易状态
-    const swapCallback = async (status, inputToken, outToken) => {
-        // 循环获取交易结果
-        const {
-            transaction: { transactions },
-        } = props;
-        // 检查是否已经包含此交易
-        const transLength = transactions.filter(item => item.hash == status.hash).length;
+    const wrap = async () => {
+        setIsSubmitting(true);
 
-        const sti = async (hash) => {
-            library.getTransactionReceipt(hash).then(async receipt => {
-                console.log(`receiptreceipt for ${hash}: `, receipt);
-                // receipt is not null when transaction is done
-                if (!receipt)
-                    setTimeout(sti(hash), 500);
-                else {
-
-                    if (!receipt.status) {
-                        setSwapButtonContent("Failed");
-                    } else {
-
-                        props.onGetReceipt(receipt.transactionHash, library, account);
-
-                        // set button to done and disabled on default
-                        setSwapButtonContent("Done");
-                    }
-
-                    const newData = transactions.filter(item => item.hash != hash);
-                    dispatch({
-                        type: 'transaction/addTransaction',
-                        payload: {
-                            transactions: newData
-                        },
-                    });
-
-                }
+        const contract = new ethers.Contract(
+            getContractAddress(chainId, 'NATIVE_TOKEN'),
+            WETHABI,
+            library.getSigner()
+        );
+        Api.callContract(chainId, contract, 'deposit', {
+            value: fromAmount,
+            sentMsg: 'Swap submitted!',
+            successMsg: `Swapped ${formatAmount(fromAmount, fromToken.decimals, 4, true)} ${fromToken.symbol
+                } for ${formatAmount(toAmount, toToken.decimals, 4, true)} ${toToken.symbol}`,
+            failMsg: 'Swap failed.',
+            setPendingTxns,
+        })
+            .then(async res => { })
+            .finally(() => {
+                setIsSubmitting(false);
             });
-        }
-        sti(status.hash);
+    };
+
+    const unwrap = async () => {
+        setIsSubmitting(true);
+
+        const contract = new ethers.Contract(
+            getContractAddress(chainId, 'NATIVE_TOKEN'),
+            WETHABI,
+            library.getSigner()
+        );
+        Api.callContract(chainId, contract, 'withdraw', [fromAmount], {
+            sentMsg: 'Swap submitted!',
+            failMsg: 'Swap failed.',
+            successMsg: `Swapped ${formatAmount(fromAmount, fromToken.decimals, 4, true)} ${fromToken.symbol
+                } for ${formatAmount(toAmount, toToken.decimals, 4, true)} ${toToken.symbol}`,
+            setPendingTxns,
+        })
+            .then(async res => { })
+            .finally(() => {
+                setIsSubmitting(false);
+            });
     };
 
     const swap = async () => {
@@ -991,6 +986,7 @@ const SwapComponent = props => {
             wrap();
             return;
         }
+
         if (fromTokenAddress.isWrapped && toToken.isNative) {
             unwrap();
             return;
@@ -1035,22 +1031,18 @@ const SwapComponent = props => {
         let value;
         let params;
         let minOut;
-        if (
-            shouldRaiseGasError(
-                getTokenInfo(infoTokens, fromTokenAddress),
-                fromAmount
-            )
-        ) {
+        if (shouldRaiseGasError(getTokenInfo(infoTokens, fromTokenAddress), fromAmount)) {
             setIsSubmitting(false);
             setIsPendingConfirmation(true);
             helperToast.error(
                 `Leave at least ${formatAmount(DUST_BNB, 18, 3)} ${getConstant(
                     chainId,
-                    "nativeTokenSymbol"
+                    'nativeTokenSymbol'
                 )} for gas`
             );
             return;
         }
+
         if (!isMarketOrder) {
             minOut = toAmount;
             Api.createSwapOrder(
@@ -1060,13 +1052,13 @@ const SwapComponent = props => {
                 fromAmount,
                 minOut,
                 triggerRatio,
-                getContractAddress(chainId, "NATIVE_TOKEN"),
+                getContractAddress(chainId, 'NATIVE_TOKEN'),
                 {
-                    sentMsg: "Swap Order submitted!",
-                    successMsg: "Swap Order created!",
-                    failMsg: "Swap Order creation failed",
+                    sentMsg: 'Swap Order submitted!',
+                    successMsg: 'Swap Order created!',
+                    failMsg: 'Swap Order creation failed',
                     pendingTxns,
-                    setPendingTxns
+                    setPendingTxns,
                 }
             )
                 .then(() => {
@@ -1079,44 +1071,33 @@ const SwapComponent = props => {
             return;
         }
 
-        path = replaceNativeTokenAddress(path, getContractAddress(chainId, "NATIVE_TOKEN"));
-        method = "swap";
+        path = replaceNativeTokenAddress(path, getContractAddress(chainId, 'NATIVE_TOKEN'));
+        method = 'swap';
         value = bigNumberify(0);
         if (toTokenAddress === AddressZero) {
-            method = "swapTokensToETH";
+            method = 'swapTokensToETH';
         }
 
-        minOut = toAmount
-            .mul(BASIS_POINTS_DIVISOR - savedSlippageAmount)
-            .div(BASIS_POINTS_DIVISOR);
+        minOut = toAmount.mul(BASIS_POINTS_DIVISOR - savedSlippageAmount).div(BASIS_POINTS_DIVISOR);
         params = [path, fromAmount, minOut, account];
         if (fromTokenAddress === AddressZero) {
-            method = "swapETHToTokens";
+            method = 'swapETHToTokens';
             value = fromAmount;
             params = [path, minOut, account];
         }
         contract = new ethers.Contract(
-            getContractAddress(chainId, "Router"),
+            getContractAddress(chainId, 'Router'),
             Router.abi,
             library.getSigner()
         );
 
         Api.callContract(chainId, contract, method, params, {
             value,
-            sentMsg: `Swap ${!isMarketOrder ? " order " : ""} submitted!`,
-            successMsg: `Swapped ${formatAmount(
-                fromAmount,
-                fromToken.decimals,
-                4,
-                true
-            )} ${fromToken.symbol} for ${formatAmount(
-                toAmount,
-                toToken.decimals,
-                4,
-                true
-            )} ${toToken.symbol}`,
-            failMsg: "Swap failed.",
-            setPendingTxns
+            sentMsg: `Swap ${!isMarketOrder ? ' order ' : ''} submitted!`,
+            successMsg: `Swapped ${formatAmount(fromAmount, fromToken.decimals, 4, true)} ${fromToken.symbol
+                } for ${formatAmount(toAmount, toToken.decimals, 4, true)} ${toToken.symbol}`,
+            failMsg: 'Swap failed.',
+            setPendingTxns,
         })
             .then(async () => {
                 setIsConfirming(false);
@@ -1128,37 +1109,63 @@ const SwapComponent = props => {
     };
 
     function handleSwap() {
-        //when need approval :
-        //orderbook approval, setOrders to Open
-        //approve from token (in gmx = approve in acy)
-        //modal
-        //after isSwap
+        // when need approval :
+        // orderbook approval, setOrders to Open
+        // approve from token (in gmx = approve in acy)
+        // modal
+        // after isSwap
+        if (
+            fromTokenAddress === AddressZero &&
+            toTokenAddress === getContractAddress(chainId, 'NATIVE_TOKEN')
+        ) {
+            wrap();
+            return;
+        }
 
-        // console.log("fromToken", fromTokenAddress)
-        // console.log("toToken", toTokenAddress)
-
-        // if (needOrderBookApproval) {
-        //     approveOrderBook();
-        //     return;
-        // }
-
-        setIsPendingConfirmation(true);
-
-        swap();
-
-        // if (orderOption === LIMIT) {
-        //     createIncreaseOrder();
-        //     return;
-        // }
-        // increasePosition();
-
-        //setIsConfirming(true);
-        //confirm metamask operation confirmed or not
+        if (token0Addr === getContractAddress(chainId, 'NATIVE_TOKEN') && token1Addr === AddressZero) {
+            unwrap();
+            return;
+        }
+        setIsConfirming(true);
         //metamask operations
-        //setSwapButtonState(true);
     }
 
+    // swap的交易状态
+    const swapCallback = async (status, inputToken, outToken) => {
+        // 循环获取交易结果
+        const {
+            transaction: { transactions },
+        } = props;
+        // 检查是否已经包含此交易
+        const transLength = transactions.filter(item => item.hash == status.hash).length;
 
+        const sti = async hash => {
+            library.getTransactionReceipt(hash).then(async receipt => {
+                console.log(`receiptreceipt for ${hash}: `, receipt);
+                // receipt is not null when transaction is done
+                if (!receipt) setTimeout(sti(hash), 500);
+                else {
+                    if (!receipt.status) {
+                        setSwapButtonContent('Failed');
+                    } else {
+                        props.onGetReceipt(receipt.transactionHash, library, account);
+
+                        // set button to done and disabled on default
+                        setSwapButtonContent('Done');
+                    }
+
+                    const newData = transactions.filter(item => item.hash != hash);
+                    dispatch({
+                        type: 'transaction/addTransaction',
+                        payload: {
+                            transactions: newData,
+                        },
+                    });
+                }
+            });
+        };
+        sti(status.hash);
+    };
 
     const perpetualMode = [LONG, MARKET];
     const perpetualType = [{
@@ -1171,18 +1178,15 @@ const SwapComponent = props => {
         id: LIMIT,
     }];
 
-
     // LONG or SHORT
     const modeSelect = (input) => {
         setMode(input);
     }
 
     // MARKET or LIMIT
-    const typeSelect = (input) => {
+    const typeSelect = input => {
         setType(input);
     }
-    //hj merge calculateFee, limitOnChange, markOnClick commented
-    //leverageSliderOnChange not written
     // const calculateFee = () => fees * 100
     // const limitOnChange = (e) => {
     //   const check = Pattern.coinNum.test(e.target.value);
@@ -1219,12 +1223,7 @@ const SwapComponent = props => {
         setToTokenAddress(fromTokenAddress)
     };
 
-    const isLeverageDisabled = true
-
     const getLeverageError = useCallback(() => {
-        if (isLeverageDisabled) {
-            return ["Temporarily disabled, pending upgrade"]
-        }
 
         if (!toAmount || toAmount.eq(0)) {
             return ["Enter an amount"];
@@ -1442,13 +1441,111 @@ const SwapComponent = props => {
         triggerPriceValue,
         usdgSupply,
         entryMarkPrice,
-        isLeverageDisabled
+        // isLeverageDisabled
     ]);
+
+    const getSwapError = () => {
+        if (fromTokenAddress === toTokenAddress) {
+            return ["Select different tokens"];
+        }
+
+        if (type === MARKET) {
+            if (
+                (toToken.isStable || toToken.isUsdg) &&
+                (fromToken.isStable || fromToken.isUsdg)
+            ) {
+                return ["Select different tokens"];
+            }
+
+            if (fromToken.isNative && toToken.isWrapped) {
+                return ["Select different tokens"];
+            }
+
+            if (toToken.isNative && fromToken.isWrapped) {
+                return ["Select different tokens"];
+            }
+        }
+
+        if (!fromAmount || fromAmount.eq(0)) {
+            return ["Enter an amount"];
+        }
+        if (!toAmount || toAmount.eq(0)) {
+            return ["Enter an amount"];
+        }
+
+        const fromTokenInfo = getTokenInfo(infoTokens, fromTokenAddress);
+        if (!fromTokenInfo || !fromTokenInfo.minPrice) {
+            return ["Incorrect network"];
+        }
+        if (
+            fromTokenInfo &&
+            fromTokenInfo.balance &&
+            fromAmount &&
+            fromAmount.gt(fromTokenInfo.balance)
+        ) {
+            return [`Insufficient ${fromTokenInfo.symbol} balance`];
+        }
+
+        const toTokenInfo = getTokenInfo(infoTokens, toTokenAddress);
+
+        if (type !== MARKET) {
+            if (!triggerRatioValue || triggerRatio.eq(0)) {
+                return ["Enter a price"];
+            }
+
+            const currentRate = getExchangeRate(fromTokenInfo, toTokenInfo);
+            if (currentRate && currentRate.lt(triggerRatio)) {
+                return [`Price ${triggerRatioInverted ? "below" : "above"} Mark Price`];
+            }
+        }
+
+        if (
+            !isWrapOrUnwrap &&
+            toToken &&
+            toTokenAddress !== USDG_ADDRESS &&
+            toTokenInfo &&
+            toTokenInfo.availableAmount &&
+            toAmount.gt(toTokenInfo.availableAmount)
+        ) {
+            return ["Insufficient liquidity"];
+        }
+        if (
+            !isWrapOrUnwrap &&
+            toAmount &&
+            toTokenInfo.bufferAmount &&
+            toTokenInfo.poolAmount &&
+            toTokenInfo.bufferAmount.gt(toTokenInfo.poolAmount.sub(toAmount))
+        ) {
+            return ["Insufficient liquidity"];
+        }
+
+        if (
+            fromUsdMin &&
+            fromTokenInfo.maxUsdgAmount &&
+            fromTokenInfo.maxUsdgAmount.gt(0) &&
+            fromTokenInfo.usdgAmount &&
+            fromTokenInfo.maxPrice
+        ) {
+            const usdgFromAmount = adjustForDecimals(
+                fromUsdMin,
+                USD_DECIMALS,
+                USDG_DECIMALS
+            );
+            const nextUsdgAmount = fromTokenInfo.usdgAmount.add(usdgFromAmount);
+
+            if (nextUsdgAmount.gt(fromTokenInfo.maxUsdgAmount)) {
+                return [`${fromTokenInfo.symbol} pool exceeded`];
+            }
+        }
+
+        return [false];
+    };
 
     const getError = () => {
         if (mode !== SWAP) {
             return getLeverageError();
         }
+        return getSwapError()
     };
 
     const isPrimaryEnabled = () => {
@@ -1545,8 +1642,8 @@ const SwapComponent = props => {
     }
 
     const onClickPrimary = () => {
-        if (!active) {
-            props.connectWallet();
+        if (!account) {
+            connectWalletByLocalStorage()
             return;
         }
 
@@ -1588,66 +1685,6 @@ const SwapComponent = props => {
         setIsConfirming(true);
     };
 
-    const wrap = async () => {
-        setIsSubmitting(true);
-
-        const contract = new ethers.Contract(
-            nativeTokenAddress,
-            WETH.abi,
-            library.getSigner()
-        );
-        callContract(chainId, contract, "deposit", {
-            value: fromAmount,
-            sentMsg: "Swap submitted!",
-            successMsg: `Swapped ${formatAmount(
-                fromAmount,
-                fromToken.decimals,
-                4,
-                true
-            )} ${fromToken.symbol} for ${formatAmount(
-                toAmount,
-                toToken.decimals,
-                4,
-                true
-            )} ${toToken.symbol}`,
-            failMsg: "Swap failed.",
-            setPendingTxns
-        })
-            .then(async res => { })
-            .finally(() => {
-                setIsSubmitting(false);
-            });
-    };
-
-    const unwrap = async () => {
-        setIsSubmitting(true);
-
-        const contract = new ethers.Contract(
-            nativeTokenAddress,
-            WETH.abi,
-            library.getSigner()
-        );
-        callContract(chainId, contract, "withdraw", [fromAmount], {
-            sentMsg: "Swap submitted!",
-            failMsg: "Swap failed.",
-            successMsg: `Swapped ${formatAmount(
-                fromAmount,
-                fromToken.decimals,
-                4,
-                true
-            )} ${fromToken.symbol} for ${formatAmount(
-                toAmount,
-                toToken.decimals,
-                4,
-                true
-            )} ${toToken.symbol}`,
-            setPendingTxns
-        })
-            .then(async res => { })
-            .finally(() => {
-                setIsSubmitting(false);
-            });
-    };
 
     let hasZeroBorrowFee = false;
     let borrowFeeText;
@@ -1867,13 +1904,13 @@ const SwapComponent = props => {
                 }
 
                 <div>
-                    {/* <AcyButton
+                    <AcyButton
                         style={{ marginTop: '25px' }}
                         onClick={onClickPrimary}
-                        //disabled={!isPrimaryEnabled()}
+                        disabled={!isPrimaryEnabled()}
                     >
                         {getPrimaryText()}
-                    </AcyButton> */}
+                    </AcyButton>
                 </div>
 
             </AcyCard>
@@ -1915,12 +1952,11 @@ const SwapComponent = props => {
                         <div className={styles.detailCard}>
                             <div className={styles.label}>Leverage</div>
                             <div className={styles.value}>
-                                {hasExistingPosition && toAmount && toAmount.gt(0) && (
-                                    <div>
-                                        {formatAmount(existingPosition.leverage, 4, 2)}x →
-                                        {/* <BsArrowRight className="transition-arrow" /> */}
-                                    </div>
-                                )}
+                                {hasExistingPosition &&
+                                    toAmount &&
+                                    toAmount.gt(0) &&
+                                    `${formatAmount(existingPosition.leverage, 4, 2)}x →`
+                                }
                                 {toAmount &&
                                     leverage &&
                                     leverage.gt(0) &&
@@ -1934,12 +1970,11 @@ const SwapComponent = props => {
                         <div className={styles.detailCard}>
                             <div className={styles.label}>Entry Price</div>
                             <div className={styles.value}>
-                                {hasExistingPosition && toAmount && toAmount.gt(0) && (
-                                    <div>
-                                        ${formatAmount(existingPosition.averagePrice, USD_DECIMALS, 2, true)} →
-                                        {/* <BsArrowRight className="transition-arrow" /> */}
-                                    </div>
-                                )}
+                                {hasExistingPosition &&
+                                    toAmount &&
+                                    toAmount.gt(0) &&
+                                    `$${formatAmount(existingPosition.averagePrice, USD_DECIMALS, 2, true)} →`
+                                }
                                 {nextAveragePrice &&
                                     `$${formatAmount(nextAveragePrice, USD_DECIMALS, 2, true)}`}
                                 {!nextAveragePrice && `-`}
@@ -1950,12 +1985,11 @@ const SwapComponent = props => {
                         <div className={styles.detailCard}>
                             <div className={styles.label}>Liq. Price</div>
                             <div className={styles.value}>
-                                {hasExistingPosition && toAmount && toAmount.gt(0) && (
-                                    <div className="inline-block muted">
-                                        ${formatAmount(existingLiquidationPrice, USD_DECIMALS, 2, true)} →
-                                        {/* <BsArrowRight className="transition-arrow" /> */}
-                                    </div>
-                                )}
+                                {hasExistingPosition &&
+                                    toAmount &&
+                                    toAmount.gt(0) &&
+                                    `$${formatAmount(existingLiquidationPrice, USD_DECIMALS, 2, true)} →`
+                                }
                                 {toAmount && displayLiquidationPrice &&
                                     `$${formatAmount(displayLiquidationPrice, USD_DECIMALS, 2, true)}`
                                 }
@@ -2042,30 +2076,6 @@ const SwapComponent = props => {
                                 </div>
                             </Tooltip>
                         </div>
-                        <AcyCuarrencyCard
-                            icon="eth"
-                            title={token0BalanceShow && `Balance: ${parseFloat(token0Balance).toFixed(3)}`}
-                            //coin={(token0 && token0.symbol) || 'Select'}
-                            coin={(fromTokenInfo && fromTokenInfo.symbol) || 'Select'}
-                            logoURI={token0 && token0.logoURI}
-                            yuan="566.228"
-                            dollar={`${token0Balance}`}
-                            //token={token0Amount}
-                            token={fromValue}
-                            bonus={!exactIn && bonus0}
-                            showBalance={token1BalanceShow}
-                            onChoseToken={() => {
-                                onClickCoin();
-                                setBefore(true);
-                            }}
-                            onChangeToken={e => {
-                                //setToken0Amount(e);
-                                setFromValue(e)
-                                setExactIn(true);
-                                t0Changed(e);
-                            }}
-                            library={library}
-                        />
 
                         {/* Exit Price */}
                         <div className={styles.detailCard}>

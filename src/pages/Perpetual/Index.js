@@ -16,7 +16,8 @@ import {
     AcyConfirm,
     AcyApprove,
 } from '@/components/Acy';
-
+// import { PriceBox } from './components/PriceBox';
+// import { DetailBox } from './components/DetailBox';
 import {
     ACTIONS,
     ORDERS,
@@ -33,7 +34,8 @@ import {
     bigNumberify,
     getDeltaStr,
     useLocalStorageByChainId,
-    getSavedSlippageAmount
+    getSavedSlippageAmount,
+    useAccountOrders
 } from '@/acy-dex-futures/utils';
 
 import {
@@ -55,6 +57,7 @@ import { getTransactionsByAccount, appendNewSwapTx, findTokenWithSymbol } from '
 import { getTokenContract } from '@/acy-dex-swap/utils/index';
 import PerpetualComponent from '@/components/PerpetualComponent';
 import PageHeaderWrapper from '@/components/PageHeaderWrapper';
+import Kchart from './components/Kchart';
 import axios from 'axios';
 import moment from 'moment';
 import styles from './styles.less';
@@ -383,9 +386,17 @@ const Swap = props => {
         fetcher: fetcher(tempLibrary, Router)
     });
 
+    useEffect(() => {
+
+        //console.log("printing all vault", vaultTokenInfo);
+
+    }, [vaultTokenInfo])
 
     const infoTokens = getInfoTokens(tokens, tokenBalances, whitelistedTokens, vaultTokenInfo, fundingRateInfo)
+    //hj console.log("token balances", tokenBalances)
     const { positions, positionsMap } = getPositions(tempChainID, positionQuery, positionData, infoTokens, true)
+    // const [orders, updateOrders] = useAccountOrders(flagOrdersEnabled)
+
 
     const [isWaitingForPluginApproval, setIsWaitingForPluginApproval] = useState(false);
     const [isPluginApproving, setIsPluginApproving] = useState(false);
@@ -480,7 +491,6 @@ const Swap = props => {
             connectWalletByLocalStorage()
         }
     }, [account]);
-
 
     // 时间段选择
     const onhandPeriodTimeChoose = periodTimeName => {
@@ -973,7 +983,7 @@ const Swap = props => {
             <div className={styles.main}>
                 <div className={styles.rowFlexContainer}>
                     <div className={`${styles.colItem} ${styles.priceChart}`}>
-                        <div ref={chartRef}></div>
+                        <Kchart></Kchart>
                     </div>
                     <div className={`${styles.colItem} ${styles.perpetualComponent}`} >
                         {/* <AcyCard style={{ backgroundColor: '#1B1B1C', padding: '10px' }}> */}
@@ -1038,6 +1048,8 @@ const Swap = props => {
                 <div className={styles.rowFlexContainer}>
                     <div className={`${styles.colItem} ${styles.priceChart}`}>
                         <div className={styles.Trade}>
+                            {/* <div className={styles.positionsTable}> */}
+                            {/* conflict here */}
                             <RenderTable />
                         </div>
                     </div>

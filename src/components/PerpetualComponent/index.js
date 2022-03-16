@@ -86,7 +86,7 @@ import {
     // tempLibrary
 } from '@/acy-dex-futures/samples/constants'
 // import { getTokens } from '../../acy-dex-futures/data/Tokens'
-// import { getTokens } from '@/acy-dex-futures/data/Tokens'
+import { getTokens } from '@/acy-dex-futures/data/Tokens'
 
 
 import { callContract } from '@/acy-dex-futures/core/Perpetual'
@@ -2273,87 +2273,7 @@ const SwapComponent = props => {
         onCoinClick={onCoinClick}
       /> */}
         </div>
-    )
-}
-{
-    mode === SWAP && (
-        <DetailBox
-            leverage={leverage}
-            shortOrLong={mode}
-            marketOrLimit={type}
-            profitsIn={profitsIn}
-            entryPriceLimit={entryPriceLimit}
-            liqPrice={liqPrice}
-            entryPriceMarket={entryPriceMarket}
-            exitPrice={exitPrice}
-            borrowFee={borrowFee}
-            token1Symbol={token1.symbol}
-            fromUsdMin={fromUsdMin}
-            toUsdMax={toUsdMax}
-            toTokenInfo={toTokenInfo}
-            triggerPriceValue={triggerPriceValue}
-        />
-    )
-}
-{
-    needApprove ? (
-        <div>
-            <AcyButton
-                style={{ marginTop: '25px' }}
-                disabled={!approveButtonStatus}
-                onClick={async () => {
-                    setShowSpinner(true);
-                    setApproveButtonStatus(false);
-                    const state = await approve(token0.address, approveAmount, library, account);
-                    setApproveButtonStatus(true);
-                    setShowSpinner(false);
-
-                    if (state) {
-                        setSwapButtonState(true);
-                        setSwapButtonContent('Swap');
-                        setApproveButtonStatus(false);
-                        setNeedApprove(false);
-                        console.log('test needApprove false');
-                    }
-                }}
-            >
-                Approve {showSpinner && <Icon type="loading" />}
-            </AcyButton>{' '}
-        </div>
-    ) : (
-        <AcyButton
-            style={{ marginTop: '25px' }}
-            disabled={!swapButtonState}
-            onClick={() => {
-                if (account == undefined) {
-                    // connectWalletByLocalStorage();
-                } else {
-                    //hj TODO
-                    // if ( currentTab == "swap" ) {
-                    //     setSwapButtonState( false )
-                    //     handleSwap();
-                    // }
-                    console.log('ready for function ymj');
-                }
-            }}
-        >
-            {swapButtonContent}
-        </AcyButton>
-    )
-}
-
-      <AcyDescriptions>
-        {swapStatus && <AcyDescriptions.Item> {swapStatus}</AcyDescriptions.Item>}
-      </AcyDescriptions>
-
-      <TokenSelectorModal
-        onCancel={onCancel}
-        width={400}
-        visible={visible}
-        onCoinClick={onCoinClick}
-      />
-    </div >
-  );
+    );
 };
 
 export default connect(({ global, transaction, swap, loading }) => ({

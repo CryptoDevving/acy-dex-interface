@@ -86,7 +86,7 @@ import {
     // tempLibrary
 } from '@/acy-dex-futures/samples/constants'
 // import { getTokens } from '../../acy-dex-futures/data/Tokens'
-import { getTokens } from '@/acy-dex-futures/data/Tokens'
+// import { getTokens } from '@/acy-dex-futures/data/Tokens'
 
 
 import { callContract } from '@/acy-dex-futures/core/Perpetual'
@@ -282,6 +282,7 @@ const SwapComponent = props => {
     const savedSlippageAmount = getSavedSlippageAmount(chainId)
     console.log("here tokens")
     const tokens = defaultToken
+
     const whitelistedTokens = tokens.filter(t => t.symbol !== "USDG")
     const stableTokens = tokens.filter(token => token.isStable);
     const indexTokens = whitelistedTokens.filter(token => !token.isStable && !token.isWrapped);

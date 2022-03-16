@@ -32,7 +32,7 @@ import {
     AcyApprove,
     AcyButton,
     AcyDescriptions,
-    AcySmallButton,
+    AcySmallButton
 } from '@/components/Acy';
 import TokenSelectorModal from '@/components/TokenSelectorModal';
 // ymj swapBox components start
@@ -82,8 +82,8 @@ import {
     nativeTokenAddress,
     routerAddress,
     orderBookAddress,
-    // tempChainID,
-    // tempLibrary
+    tempChainID,
+    tempLibrary
 } from '@/acy-dex-futures/samples/constants'
 // import { getTokens } from '../../acy-dex-futures/data/Tokens'
 // import { getTokens } from '@/acy-dex-futures/data/Tokens'
@@ -281,7 +281,7 @@ const SwapComponent = props => {
 
     const savedSlippageAmount = getSavedSlippageAmount(chainId)
     console.log("here tokens")
-    const tokens = defaultToken
+    const tokens = defaultToken.default
 
     const whitelistedTokens = tokens.filter(t => t.symbol !== "USDG")
     const stableTokens = tokens.filter(token => token.isStable);
@@ -376,29 +376,29 @@ const SwapComponent = props => {
     // const slippageTolerancePlaceholder = 'Please input a number from 1.00 to 100.00';
 
     const tokenAddresses = tokens.map(token => token.address)
-    const { data: tokenBalances, mutate: updateTokenBalances } = useSWR([chainId, readerAddress, "getTokenBalances", account || PLACEHOLDER_ACCOUNT], {
-        fetcher: fetcher(library, Reader, [tokenAddresses]),
+    const { data: tokenBalances, mutate: updateTokenBalances } = useSWR([tempChainID, readerAddress, "getTokenBalances", account || PLACEHOLDER_ACCOUNT], {
+        fetcher: fetcher(tempLibrary, Reader, [tokenAddresses]),
     })
     const whitelistedTokenAddresses = whitelistedTokens.map(token => token.address)
-    const { data: vaultTokenInfo, mutate: updateVaultTokenInfo } = useSWR([chainId, readerAddress, "getFullVaultTokenInfo"], {
-        fetcher: fetcher(library, ReaderV2, [vaultAddress, nativeTokenAddress, expandDecimals(1, 18), whitelistedTokenAddresses]),
+    const { data: vaultTokenInfo, mutate: updateVaultTokenInfo } = useSWR([tempChainID, readerAddress, "getFullVaultTokenInfo"], {
+        fetcher: fetcher(tempLibrary, ReaderV2, [vaultAddress, nativeTokenAddress, expandDecimals(1, 18), whitelistedTokenAddresses]),
     })
-    const { data: fundingRateInfo, mutate: updateFundingRateInfo } = useSWR([chainId, readerAddress, "getFundingRates"], {
-        fetcher: fetcher(library, Reader, [vaultAddress, nativeTokenAddress, whitelistedTokenAddresses]),
+    const { data: fundingRateInfo, mutate: updateFundingRateInfo } = useSWR([tempChainID, readerAddress, "getFundingRates"], {
+        fetcher: fetcher(tempLibrary, Reader, [vaultAddress, nativeTokenAddress, whitelistedTokenAddresses]),
     })
-    const { data: totalTokenWeights, mutate: updateTotalTokenWeights } = useSWR([chainId, vaultAddress, "totalTokenWeights"], {
-        fetcher: fetcher(library, VaultV2),
+    const { data: totalTokenWeights, mutate: updateTotalTokenWeights } = useSWR([tempChainID, vaultAddress, "totalTokenWeights"], {
+        fetcher: fetcher(tempLibrary, VaultV2),
     })
-    const { data: usdgSupply, mutate: updateUsdgSupply } = useSWR([chainId, usdgAddress, "totalSupply"], {
-        fetcher: fetcher(library, Token),
+    const { data: usdgSupply, mutate: updateUsdgSupply } = useSWR([tempChainID, usdgAddress, "totalSupply"], {
+        fetcher: fetcher(tempLibrary, Token),
     })
-    const { data: orderBookApproved, mutate: updateOrderBookApproved } = useSWR([chainId, routerAddress, "approvedPlugins", account || PLACEHOLDER_ACCOUNT, orderBookAddress], {
-        fetcher: fetcher(library, Router)
+    const { data: orderBookApproved, mutate: updateOrderBookApproved } = useSWR([tempChainID, routerAddress, "approvedPlugins", account || PLACEHOLDER_ACCOUNT, orderBookAddress], {
+        fetcher: fetcher(tempLibrary, Router)
     });
 
     const tokenAllowanceAddress = fromTokenAddress === AddressZero ? nativeTokenAddress : fromTokenAddress;
-    const { data: tokenAllowance, mutate: updateTokenAllowance } = useSWR([chainId, tokenAllowanceAddress, "allowance", account || PLACEHOLDER_ACCOUNT, routerAddress], {
-        fetcher: fetcher(library, Token)
+    const { data: tokenAllowance, mutate: updateTokenAllowance } = useSWR([tempChainID, tokenAllowanceAddress, "allowance", account || PLACEHOLDER_ACCOUNT, routerAddress], {
+        fetcher: fetcher(tempLibrary, Token)
     });
 
     // default collateral address on ARBITRUM

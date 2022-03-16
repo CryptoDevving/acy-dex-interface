@@ -34,12 +34,12 @@ import {
     AcyDescriptions,
     AcySmallButton,
 } from '@/components/Acy';
-import TokenSelectorModal from "@/components/TokenSelectorModal";
+import TokenSelectorModal from '@/components/TokenSelectorModal';
 // ymj swapBox components start
 import { PriceBox } from './components/PriceBox';
 import { DetailBox } from './components/DetailBox';
 
-import { MARKET, LIMIT, LONG, SHORT, SWAP } from './constant'
+import { MARKET, LIMIT, LONG, SHORT, SWAP } from './constant';
 import {
     USD_DECIMALS,
     USDG_ADDRESS,
@@ -135,8 +135,7 @@ import { swapGetEstimated, swap } from '@/acy-dex-swap/core/swap';
 
 import ERC20ABI from '@/abis/ERC20.json';
 import WETHABI from '@/abis/WETH.json';
-import Router from "@/acy-dex-futures/abis/Router.json";
-
+import Router from '@/acy-dex-futures/abis/Router.json';
 
 import {
     // Token,
@@ -176,21 +175,19 @@ const { TabPane } = Tabs;
 const { AddressZero } = ethers.constants;
 
 const StyledRadioButton = styled(Radio.Button)`
-.ant-long{
-  background-color: #0ecc83;
-  border: none;
-  border-left: none !important;
-}
-.ant-short{
-
-}
-.ant-swap{
-
-}
+  .ant-long {
+    background-color: #0ecc83;
+    border: none;
+    border-left: none !important;
+  }
+  .ant-short {
+  }
+  .ant-swap {
+  }
 `;
 
 const StyledSlider = styled(Slider)`
-  .ant-slider-track{
+  .ant-slider-track {
     background: #be4d00;
   }
   .ant-slider-rail {
@@ -2276,7 +2273,87 @@ const SwapComponent = props => {
         onCoinClick={onCoinClick}
       /> */}
         </div>
-    );
+    )
+}
+{
+    mode === SWAP && (
+        <DetailBox
+            leverage={leverage}
+            shortOrLong={mode}
+            marketOrLimit={type}
+            profitsIn={profitsIn}
+            entryPriceLimit={entryPriceLimit}
+            liqPrice={liqPrice}
+            entryPriceMarket={entryPriceMarket}
+            exitPrice={exitPrice}
+            borrowFee={borrowFee}
+            token1Symbol={token1.symbol}
+            fromUsdMin={fromUsdMin}
+            toUsdMax={toUsdMax}
+            toTokenInfo={toTokenInfo}
+            triggerPriceValue={triggerPriceValue}
+        />
+    )
+}
+{
+    needApprove ? (
+        <div>
+            <AcyButton
+                style={{ marginTop: '25px' }}
+                disabled={!approveButtonStatus}
+                onClick={async () => {
+                    setShowSpinner(true);
+                    setApproveButtonStatus(false);
+                    const state = await approve(token0.address, approveAmount, library, account);
+                    setApproveButtonStatus(true);
+                    setShowSpinner(false);
+
+                    if (state) {
+                        setSwapButtonState(true);
+                        setSwapButtonContent('Swap');
+                        setApproveButtonStatus(false);
+                        setNeedApprove(false);
+                        console.log('test needApprove false');
+                    }
+                }}
+            >
+                Approve {showSpinner && <Icon type="loading" />}
+            </AcyButton>{' '}
+        </div>
+    ) : (
+        <AcyButton
+            style={{ marginTop: '25px' }}
+            disabled={!swapButtonState}
+            onClick={() => {
+                if (account == undefined) {
+                    // connectWalletByLocalStorage();
+                } else {
+                    //hj TODO
+                    // if ( currentTab == "swap" ) {
+                    //     setSwapButtonState( false )
+                    //     handleSwap();
+                    // }
+                    console.log('ready for function ymj');
+                }
+            }}
+        >
+            {swapButtonContent}
+        </AcyButton>
+    )
+}
+
+      <AcyDescriptions>
+        {swapStatus && <AcyDescriptions.Item> {swapStatus}</AcyDescriptions.Item>}
+      </AcyDescriptions>
+
+      <TokenSelectorModal
+        onCancel={onCancel}
+        width={400}
+        visible={visible}
+        onCoinClick={onCoinClick}
+      />
+    </div >
+  );
 };
 
 export default connect(({ global, transaction, swap, loading }) => ({
@@ -2286,4 +2363,3 @@ export default connect(({ global, transaction, swap, loading }) => ({
     swap,
     loading: loading.global,
 }))(SwapComponent);
-

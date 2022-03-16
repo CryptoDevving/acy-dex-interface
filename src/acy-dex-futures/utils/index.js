@@ -633,7 +633,7 @@ export const fetcher = (library, contractInfo, additionalArgs) => (...args) => {
         console.error(contractInfo.contractName, method, e)
     }
 
-    if (ethers.utils.isHexString(arg0)) {
+    if (ethers.utils.isAddress(arg0)) {
         const address = arg0
         const contract = new ethers.Contract(address, contractInfo.abi, library)
         try {

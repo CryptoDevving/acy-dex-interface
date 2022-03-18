@@ -2199,22 +2199,142 @@ const SwapComponent = props => {
             }
 
             {mode === SWAP &&
-                <DetailBox
-                    leverage={leverage}
-                    shortOrLong={mode}
-                    marketOrLimit={type}
-                    profitsIn={profitsIn}
-                    entryPriceLimit={entryPriceLimit}
-                    liqPrice={liqPrice}
-                    entryPriceMarket={entryPriceMarket}
-                    exitPrice={exitPrice}
-                    borrowFee={borrowFee}
-                    token1Symbol={toToken.symbol}
-                    fromUsdMin={fromUsdMin}
-                    toUsdMax={toUsdMax}
-                    toTokenInfo={toTokenInfo}
-                    triggerPriceValue={triggerPriceValue}
-                />
+                <>
+                    <AcyCard style={{ backgroundColor: '#1B1B1C', padding: '10px' }}>
+
+                        {/* Fees */}
+                        < div className={styles.detailCard}>
+                            <div className={styles.label}>Fees</div>
+                            <div className={styles.value}>
+                                {!feesUsd && "-"}
+                                {feesUsd &&
+                                    <Tooltip
+                                        placement='bottomLeft'
+                                        color='#b5b5b6'
+                                        mouseEnterDelay={0.5}
+                                        title={() => {
+                                            return (
+                                                <>
+                                                    {swapFees && (
+                                                        <div>
+                                                            {collateralToken.symbol} is required for
+                                                            collateral.
+                                                            <br /><br />
+                                                            Swap {fromToken.symbol} to{" "}
+                                                            {collateralToken.symbol} Fee: $
+                                                            {formatAmount(swapFees, USD_DECIMALS, 2, true)}
+                                                            <br /><br />
+                                                        </div>
+                                                    )}
+                                                    <div>
+                                                        Position Fee (0.08% of position size): $
+                                                        {formatAmount(positionFee, USD_DECIMALS, 2, true)}
+                                                    </div>
+                                                </>
+                                            )
+                                        }}
+                                    >
+                                        <div className={styles.TooltipHandle}>
+                                            ${formatAmount(feesUsd, USD_DECIMALS, 2, true)}
+                                        </div>
+                                    </Tooltip>
+                                }
+                            </div>
+                        </div>
+                    </AcyCard>
+                    <AcyCard style={{ backgroundColor: '#1B1B1C', padding: '10px' }}>
+                        <div className={styles.detailCard}>
+                            <div className={styles.label}>{mode}&nbsp;</div>
+                        </div>
+                        <div className={styles.cardDivider} />
+
+                        {/* fromToken Price */}
+                        <div className={styles.detailCard}>
+                            <div className={styles.label}>{fromToken.symbol} Price</div>
+                            <div className="align-right">
+                                {fromTokenInfo && formatAmount(fromTokenInfo.minPrice, USD_DECIMALS, 2, true)} USD
+                            </div>
+                            {/* <Tooltip
+                                placement='bottomLeft'
+                                color='#b5b5b6'
+                                mouseEnterDelay={0.5}
+                                title={() => {
+                                    return (
+                                        <>
+                                            The position will be opened at{" "}
+                                            {formatAmount(entryMarkPrice, USD_DECIMALS, 2, true)} USD
+                                            with a max slippage of{" "}
+                                            {parseFloat(savedSlippageAmount / 100.0).toFixed(2)}%.
+                                            <br /><br />
+                                            The slippage amount can be configured under Settings,
+                                            found by clicking on your address at the top right of the
+                                            page after connecting your wallet.
+                                            <br /><br />
+                                            <a href="https://gmxio.gitbook.io/gmx/trading#opening-a-position" target="_blank" rel="noopener noreferrer">
+                                                More Info
+                                            </a>
+                                        </>
+                                    )
+                                }}
+                            >
+                                <div className={styles.TooltipHandle}>
+                                    {`${formatAmount(entryMarkPrice, USD_DECIMALS, 2, true)} USD`}
+                                </div>
+                            </Tooltip> */}
+                        </div>
+
+                        {/* Exit Price */}
+                        <div className={styles.detailCard}>
+                            <div className={styles.label}>{toToken.symbol} Price</div>
+                            <div className="align-right">
+                                {toTokenInfo && formatAmount(toTokenInfo.minPrice, USD_DECIMALS, 2, true)} USD
+                            </div>
+                            {/* <Tooltip
+                                placement='bottomLeft'
+                                color='#b5b5b6'
+                                mouseEnterDelay={0.5}
+                                title={() => {
+                                    return (
+                                        <>
+                                            If you have an existing position, the position will be
+                                            closed at{" "}
+                                            {formatAmount(entryMarkPrice, USD_DECIMALS, 2, true)} USD.
+                                            <br /><br />
+                                            This exit price will change with the price of the asset.
+                                            <br /><br />
+                                            <a href="https://gmxio.gitbook.io/gmx/trading#opening-a-position" target="_blank" rel="noopener noreferrer">
+                                                More Info
+                                            </a>
+                                        </>
+                                    )
+                                }}
+                            >
+                                <div className={styles.TooltipHandle}>
+                                    {`${formatAmount(exitMarkPrice, USD_DECIMALS, 2, true)} USD`}
+                                </div>
+                            </Tooltip> */}
+                        </div>
+
+
+                    </AcyCard>
+                </>
+
+                // {/* <DetailBox */}
+                // {/*     leverage={leverage}
+                //     shortOrLong={mode}
+                //     marketOrLimit={type}
+                //     profitsIn={profitsIn}
+                //     entryPriceLimit={entryPriceLimit}
+                //     liqPrice={liqPrice}
+                //     entryPriceMarket={entryPriceMarket}
+                //     exitPrice={exitPrice}
+                //     borrowFee={borrowFee}
+                //     token1Symbol={toToken.symbol}
+                //     fromUsdMin={fromUsdMin}
+                //     toUsdMax={toUsdMax}
+                //     toTokenInfo={toTokenInfo}
+                //     triggerPriceValue={triggerPriceValue}
+                // /> */}
             }
 
             {/* {needApprove 
@@ -2273,7 +2393,7 @@ const SwapComponent = props => {
         visible={visible} 
         onCoinClick={onCoinClick}
       /> */}
-        </div>
+        </div >
     );
 };
 

@@ -793,9 +793,9 @@ const Swap = props => {
                         <KChart token1={activeToken0} token2={activeToken1} />
                     </div>
                     <div className={`${styles.colItem} ${styles.perpetualComponent}`} >
-                        {/* <AcyCard style={{ backgroundColor: '#1B1B1C', padding: '10px' }}> */}
-                        <div className={styles.trade}>
-                            {/* <PerpetualComponent
+                        <AcyCard style={{ backgroundColor: '#1B1B1C', padding: '10px' }}>
+                            <div className={styles.trade}>
+                                <PerpetualComponent
                                     onSelectToken0={token => {
                                         setActiveToken0(token);
                                     }}
@@ -814,9 +814,9 @@ const Swap = props => {
                                     entryPriceMarket={123}
                                     exitPrice={123}
                                     borrowFee={123}
-                                /> */}
-                        </div>
-                        {/* </AcyCard> */}
+                                />
+                            </div>
+                        </AcyCard>
                     </div>
 
                 </div>
